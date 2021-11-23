@@ -32,9 +32,6 @@ public class SpringSecurityConfig extends WebSecurityConfigurerAdapter {
 	public void configurerGlobal(AuthenticationManagerBuilder build) throws Exception {
 
 		build.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder);
-		
-
-
 
 	}
 }
