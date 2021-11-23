@@ -18,47 +18,44 @@ import pe.edu.upc.service.IUsuarioService;
 @Controller
 @RequestMapping("/usuarios")
 public class UsuarioController {
-	@Autowired
+    @Autowired
     private IUsuarioService uService;
-	
-	@Secured("ROLE_USER")
-	@GetMapping("/new")
+
+    @Secured("ROLE_ADMIN")
+    @GetMapping("/new")
     public String newUsuario(Model model) {
         model.addAttribute("usuario", new Usuario());
         return "usuario/usuario";
     }
 
 
-	
     @GetMapping("/list")
     public String listUsuarios(Model model) {
-    	try {
-    		model.addAttribute("usuario", new Usuario());
-			model.addAttribute("listaUsuarios", uService.list());
-    	} catch (Exception e) {
-    		model.addAttribute("error", e.getMessage());
-    	}
-    	return "usuario/listUsuarios";
+        try {
+            model.addAttribute("usuario", new Usuario());
+            model.addAttribute("listaUsuarios", uService.list());
+        } catch (Exception e) {
+            model.addAttribute("error", e.getMessage());
+        }
+        return "usuario/listUsuarios";
     }
 
-  
 
     @PostMapping("/save")
-	public String saveUsuario(@Valid Usuario usuario, BindingResult result, Model model, SessionStatus status)
-			throws Exception {
-		if (result.hasErrors()) {
-			return "usuario/usuario";
-		} else {
-			int rpta = uService.insert(usuario);
-			if (rpta > 0) {
-				model.addAttribute("mensaje", "Ya existe");
-				return "usuario/usuario";
-			} else {
-				model.addAttribute("mensaje", "Se guardó correctamente");
-				status.setComplete();
-			}
-		}
-		model.addAttribute("usuario", new Usuario());
-		return "redirect:/usuarios/list";
-	}
+    public String saveUsuario(@Valid Usuario usuario, BindingResult result, Model model, SessionStatus status) {
+        if (result.hasErrors()) {
+            return "usuario/usuario";
+        } else {
+            int rpta = uService.insert(usuario);
+            if (rpta > 0) {
+                model.addAttribute("mensaje", "Ya existe");
+                return "usuario/usuario";
+            } else {
+                model.addAttribute("mensaje", "Se guardó correctamente");
+                status.setComplete();
+            }
+        }
+        model.addAttribute("usuario", new Usuario());
+        return "redirect:/usuarios/list";
+    }
 }
