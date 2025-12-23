@@ -6,72 +6,66 @@ from watchdog.events import FileSystemEventHandler
 
 # --- CONFIGURATION ---
 WATCH_DIRECTORY = r"C:\Users\Name\Downloads\InputFolder"
-TARGET_FILENAME = "data.csv"
-
-# Where you want the file to go
+TARGET_FILENAME = "data.csv" # The specific name you will rename the file to
 DESTINATION_DIRECTORY = r"C:\Users\Name\Documents\Processed"
 
 class FileProcessor(FileSystemEventHandler):
+    
     def on_created(self, event):
-        """Triggers when a file is added for the first time or replaced."""
-        self.process(event)
+        """Triggers when a file is pasted or created directly with the correct name."""
+        if not event.is_directory and os.path.basename(event.src_path) == TARGET_FILENAME:
+            print(f"Detected CREATION: {event.src_path}")
+            self.process_file(event.src_path)
 
     def on_modified(self, event):
-        """Triggers when the file content is changed/saved."""
-        self.process(event)
+        """Triggers when you save content to the file."""
+        if not event.is_directory and os.path.basename(event.src_path) == TARGET_FILENAME:
+            print(f"Detected MODIFICATION: {event.src_path}")
+            self.process_file(event.src_path)
 
-    def process(self, event):
-        # 1. Check if it's a file (not a folder)
-        if event.is_directory:
-            return
+    def on_moved(self, event):
+        """Triggers when you RENAME 'New Text Document.txt' to 'data.csv'."""
+        # For a move event, we check the DESTINATION path (the new name)
+        if not event.is_directory and os.path.basename(event.dest_path) == TARGET_FILENAME:
+            print(f"Detected RENAME/MOVE: {event.dest_path}")
+            self.process_file(event.dest_path)
 
-        # 2. Check if the filename matches our target
-        filename = os.path.basename(event.src_path)
-        if filename != TARGET_FILENAME:
-            return
-
-        print(f"\nEvent detected: {event.event_type} - {filename}")
-
-        # 3. Wait for the file to finish writing (Avoid "File in use" errors)
-        # We loop until the file size stops changing for 1 second
-        file_path = event.src_path
-        historical_size = -1
+    def process_file(self, file_path):
+        """Standard logic to wait for file availability and move it."""
         
+        # 1. Wait for file write to complete (Debounce/Lock check)
+        historical_size = -1
         while True:
             try:
-                # If file was already moved by a previous trigger, stop.
+                # If file vanished (e.g. moved by a previous trigger), stop.
                 if not os.path.exists(file_path):
                     return 
 
                 current_size = os.path.getsize(file_path)
                 if current_size == historical_size:
-                    break # File size is stable, ready to go
+                    break
                 
                 historical_size = current_size
                 print("Waiting for file write to complete...")
                 time.sleep(1) 
             except OSError:
-                return # File might be locked or gone
+                return # File locked/gone
 
-        # 4. Perform the Move (shutil)
+        # 2. Perform the Move
         try:
-            # Construct destination path
+            filename = os.path.basename(file_path)
             destination_path = os.path.join(DESTINATION_DIRECTORY, filename)
             
-            # If a file with the same name exists in destination, we overwrite it
+            # Overwrite if exists
             if os.path.exists(destination_path):
                 os.remove(destination_path)
 
             shutil.move(file_path, destination_path)
-            print(f"SUCCESS: Moved {filename} to {DESTINATION_DIRECTORY}")
+            print(f"SUCCESS: Moved to {destination_path}\n")
             
-            # --- ADD YOUR EXTRA AUTOMATION CODE HERE IF NEEDED ---
-            
-        except FileNotFoundError:
-            # This happens if watchdog fired twice quickly and we already moved it.
-            pass
-        except PermissionError:
-            print("ERROR: File is currently open in another program.")
+        except (FileNotFoundError, PermissionError) as e:
+            # Common errors if the event fired twice rapidly
+            print(f"Skipping (File already moved or locked): {e}")
 
 if __name__ == "__main__":
     # Ensure directories exist
@@ -84,8 +78,8 @@ if __name__ == "__main__":
     observer = Observer()
     observer.schedule(event_handler, WATCH_DIRECTORY, recursive=False)
 
-    print(f"Watching '{WATCH_DIRECTORY}' for '{TARGET_FILENAME}'...")
-    print("Press Ctrl+C to stop.")
+    print(f"Watching '{WATCH_DIRECTORY}'...")
+    print(f"Waiting for a file named: '{TARGET_FILENAME}'")
     
     observer.start()
     try:
